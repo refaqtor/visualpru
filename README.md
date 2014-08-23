@@ -1,7 +1,7 @@
 VisualPRU
 =========
 
-VisualPRU is a minimal browser-based editor and debugger for the Beaglebone PRUs. The app runs from a local server on the Beaglebone and is accessed by connecting your Beaglebone to the local network(via a USB connection, ethernet, or wireless) and navigating your browser to **192.168.7.2:3333**. The hardware is accessed by twiddling bits in memory-mapped /dev/mem . Assembly programs are compiled using TI's open-source pasm library.
+VisualPRU is a minimal browser-based editor and debugger for the Beaglebone PRUs. The app runs from a local server on the Beaglebone and is accessed by connecting your Beaglebone to your computer via a USB and navigating your browser to **192.168.7.2:3333**. You can also connect via wireless or ethernet with configuration of a static ip on the local network. The hardware is accessed by twiddling bits in memory-mapped /dev/mem . Assembly programs are compiled using TI's open-source pasm library.
 
 _Screenshot_
 ![screenshot](http://i.imgur.com/PhcfLR8.png)
