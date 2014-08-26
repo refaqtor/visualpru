@@ -40,6 +40,7 @@ def handle_websocket():
             if m is not None:
                 #NOTE: Every valid message sent will have a pruState hash and a type string
                 message = json.loads(m)
+                print(message)
                 response = {}
 
                 if message['action'] == "connect":
@@ -53,13 +54,13 @@ def handle_websocket():
                     for k,v in prus.iteritems():
                       response['availablePRUStates'][k] = v.get_state()
                 else:
-                    pru = prus[message['pruState']['id']]
+                    pru = prus[message['pruID']]
                     print(pru.id)
 
                     if message['action'] == "compile":
                         print("COMPILE")
 
-                        pru.compile_and_upload_program(COMPILATION_DIRECTORY,message['pruState']['program']['sourceFiles'])
+                        pru.compile_and_upload_program(COMPILATION_DIRECTORY,message['data']['sourceFiles'])
 
                     elif message['action'] == "run":
                         print("RUN")
@@ -83,6 +84,10 @@ def handle_websocket():
                         print("STEP")
                         pru.set_singlestep_mode()
                         pru.run()
+
+                    elif message['action'] == "set-memory-range":
+                        print("SET MEMORY RANGE")
+                        pru.set_memory_range(message['data']['range']['type'],message['data']['range']['offset'],message['data']['range']['addressCount'])
 
                     response['type'] = 'pruState'
                     response['pruState'] = pru.get_state()

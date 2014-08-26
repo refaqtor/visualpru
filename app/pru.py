@@ -1,6 +1,3 @@
-from __future__ import print_function
-from __future__ import division
-
 import os
 import mmap
 import struct
@@ -21,6 +18,8 @@ class PRU:
         self.compiled_file = {}
         self.errors = []
         self.warnings = []
+
+        self.memory_range = {'dram':{'offset':0,'address_count':0},'shared':{'offset':0,'address_count':0},'ddr':{'offset':0,'address_count':0}}
 
     #Pass in the range of addresses we want to cover, and size the mmap accordingly
     def map_memory(self,f, memory_range):
@@ -111,14 +110,28 @@ class PRU:
         for i,opcode in enumerate(opcodes):
             self.write_register(self.constants.PRU_IRAM_OFFSET,i*4,4,opcode)
 
-    def get_gpreg_value(self,number):
-        return self.read_register(self.constants.PRU_ICSS_PRU_DEBUG_OFFSET,self.shared_constants.GPREG_OFFSET+number*4,4)
+    def get_gpreg_register(self,offset):
+        return self.read_register(self.constants.PRU_ICSS_PRU_DEBUG_OFFSET,self.shared_constants.GPREG_OFFSET+offset*4,4)
 
-    def get_gpreg_values(self):
+    def get_gpreg_registers(self):
         registers = []
         for i in range(self.shared_constants.GPREG_COUNT):
-            registers.append({'name' : 'r'+str(i), 'value': self.get_gpreg_value(i)})
+            registers.append({'name' : 'r'+str(i), 'value': self.get_gpreg_register(i)})
+        return registers
 
+    #TODO: Ensure tahat requested addresses are within the memory range
+    def get_dram_block(self):
+        registers = []
+        for i in range(self.memory_range['dram']['address_count']):
+            address = self.constants.PRU_DRAM_OFFSET+self.memory_range['dram']['offset']+i*4
+            registers.append({'name' : hex(address), 'value': self.read_register(0,address,4)})
+        return registers
+
+    def get_shareddram_block(self):
+        registers = []
+        for i in range(self.memory_range['shared']['address_count']):
+            address = self.shared_constants.PRU_SHAREDDRAM_OFFSET+self.memory_range['shared']['offset']+i*4
+            registers.append({'name' : hex(address), 'value': self.read_register(0,address,4)})
         return registers
 
     def compile_and_upload_program(self, compilation_directory, source_files):
@@ -157,6 +170,10 @@ class PRU:
             self.write_opcodes_to_iram(opcodes)
             self.compiled_file = {'name':compiled_filename,'content':instructions}
 
+    def set_memory_range(self,type,offset,address_count):
+        self.memory_range[type] = {'offset':offset, 'address_count':address_count}
+        print(self.memory_range)
+
     #NOTE: This function returns a dictionary oject with state information in a format that mirrors the front-end model state
     def get_state(self):
         pru = {}
@@ -170,6 +187,6 @@ class PRU:
                             'warnings' : self.warnings
                          }
 
-        pru['memory'] = {'generalPurpose':self.get_gpreg_values()}
+        pru['memory'] = {'generalPurpose':self.get_gpreg_registers(), 'dram': self.get_dram_block(), 'shared': self.get_shareddram_block()}
 
         return pru

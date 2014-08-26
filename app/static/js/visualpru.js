@@ -94,6 +94,7 @@ app.VisualPRUApplication = Backbone.View.extend({
     this.listenTo(app.EventBus, 'compiler:run', this.onCompilerRun);
     this.listenTo(app.EventBus, 'compiler:halt', this.onCompilerHalt);
     this.listenTo(app.EventBus, 'compiler:step', this.onCompilerStep);
+    this.listenTo(app.EventBus, 'memory:set-range', this.onMemorySetRange);
 
     //Disable form submission on enter due to incorrect request being sent
     $(document).on('keypress','form input[type=text]',$.proxy(function(e){
@@ -112,31 +113,32 @@ app.VisualPRUApplication = Backbone.View.extend({
   onEditorCompile: function(sourceFiles){
     this.onEditorSave(sourceFiles);
     //Initiate the server-side compilation
-    this.sendPRUAction('compile');
+    this.sendActivePRUMessage('compile',{sourceFiles: sourceFiles});
   },
 
   onCompilerReset: function(){
-    this.sendPRUAction('reset');
+    this.sendActivePRUMessage('reset');
   },
 
-  onCompilerRun: function(sourceFile){
-    this.sendPRUAction('run');
+  onCompilerRun: function(){
+    this.sendActivePRUMessage('run');
   },
 
-  onCompilerHalt: function(sourceFile){
-    this.sendPRUAction('halt');
+  onCompilerHalt: function(){
+    this.sendActivePRUMessage('halt');
   },
 
-  onCompilerStep: function(sourceFile){
-    this.sendPRUAction('step');
+  onCompilerStep: function(){
+    this.sendActivePRUMessage('step');
   },
 
-  sendMessage: function(message){
+  onMemorySetRange: function(range){
+    this.sendActivePRUMessage('set-memory-range',range);
+  },
+
+  sendActivePRUMessage: function(action, data){
+    var message = {action: action, data: data, pruID: this.activePRU.get('id')};
     this.ws.send(JSON.stringify(message));
-  },
-
-  sendPRUAction: function(action){
-    this.sendMessage({action: action, pruState: this.activePRU.toJSON()});
   },
 
   setActivePRU: function(pruID){
@@ -235,7 +237,6 @@ app.StatusView = Backbone.View.extend({
 
     this.isConnected = false;
 
-
     this.render();
 
     this.listenTo(app.EventBus, 'application:connection:opened', this.onConnectionOpened);
@@ -272,7 +273,6 @@ app.EditorView = Backbone.View.extend({
   events: {
     'click a.new-program' : 'newProgram',
     'click a.compile' : 'compile',
-    //'change textarea' : 'prettifyText',
     'keydown textarea' : 'prettifyText',
     'paste textarea' : 'prettifyText',
     'click a.add-file-trigger' : 'addFileTrigger',
@@ -492,19 +492,19 @@ app.CompilerView = Backbone.View.extend({
   },
   reset: function(e){
     console.log("reset");
-    app.EventBus.trigger("compiler:reset",{action:'reset'});
+    app.EventBus.trigger("compiler:reset");
   },
   run: function(e){
     console.log("run");
-    app.EventBus.trigger("compiler:run",{action:'run'});
+    app.EventBus.trigger("compiler:run");
   },
   halt: function(e){
     console.log("halt");
-    app.EventBus.trigger("compiler:halt",{action:'halt'});
+    app.EventBus.trigger("compiler:halt");
   },
   step: function(e){
     console.log("step");
-    app.EventBus.trigger("compiler:step",{action:'step'});
+    app.EventBus.trigger("compiler:step");
   }
 
 });
@@ -518,7 +518,18 @@ app.MemoryView = Backbone.View.extend({
               scratchpad: [],
               shared: []
             };
+
+    this.memorySelect = 'generalPurpose';
+    this.memoryOffset = 0;
+    this.addressCount = 100; // Number of addresses to request/show
+
     this.render();
+
+  },
+  events: {
+    'change .memory-select select': 'onMemorySelect',
+    'keydown .memory-range input': 'onMemoryRangeChanged',
+    'click .memory-range a.submit' : 'setMemoryRange'
   },
   onPRUChange: function(message){
     //Extract the required information from the message.
@@ -527,11 +538,34 @@ app.MemoryView = Backbone.View.extend({
     }
     this.render();
   },
-  events: {
-    'click a.compile' : 'compile'
-  },
   render: function(){
-    this.$el.html(_.template($("#memory-view-template").html(),{memory:this.memory}));
+    this.$el.html(_.template($("#memory-view-template").html(),{memory:this.memory, selected: this.memorySelect, offset: this.memoryOffset}));
     return this;
+  },
+  onMemorySelect: function(e){
+    if(this.$el.find('.memory-select select').val()!= "generalPurpose"){
+      this.$el.find('.memory-range').show();
+    }else{
+      this.$el.find('.memory-range').hide();
+    }
+    this.memorySelect = $(e.currentTarget).val();
+
+    this.render();
+  },
+  setMemoryRange: function(e){
+    e.preventDefault();
+    this.memoryOffset = parseInt(this.$el.find('input[name="memory-offset"]').val(),16) || 0;
+    app.EventBus.trigger("memory:set-range",{range:{type:this.memorySelect, offset: this.memoryOffset, addressCount: this.addressCount}});
+  },
+  onMemoryRangeChanged: function(e){
+    var currentValue = $(e.currentTarget).val();
+    //var hex = /^[a-f0-9]+$/i;
+    //If Valid Hex Digit less than 4 bytes or a non-alphanumeric key which facilitates a good UI(eg. left-arrow, delete, shift, etc...)
+    if((e.which>=48 && e.which <= 70 && currentValue.length<8) || e.which == 8 || e.which == 46 || e.which == 37 || e.which == 36 || e.which == 35 || e.which == 39 || e.which == 16){
+      //Do Nothing
+    }else{
+      //Don't allow the value to be changed
+      e.preventDefault();
+    }
   }
 });

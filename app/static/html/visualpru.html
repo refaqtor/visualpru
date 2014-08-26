@@ -251,25 +251,44 @@
             <label>Settings</label>
         </a>
       </div>
-      <div class="row">
+      <div class="row memory-select">
           <div class="large-12 columns">
-              <select class="memory-select">
-                  <option value="generalpurpose">General Purpose</option>
-              </select>
+            <select name="memory-select">
+              <option value="generalPurpose" <%= selected == 'generalPurpose' ? 'selected':''%>>General Purpose</option>
+              <option value="dram" <%= selected == 'dram' ? 'selected':''%>>Data RAM</option>
+              <option value="shared" <%= selected == 'shared' ? 'selected':''%>>Shared RAM</option>
+            </select>
           </div>
       </div>
+
+      <div class="row collapse memory-range <%=selected == 'generalPurpose' ? 'hide' : ''%>">
+        <div class="small-3 columns">
+          <span class="prefix" style="border:transparent;background:transparent">Offset:</span>
+        </div>
+        <div class="small-2 columns">
+          <span class="prefix">0x</span>
+        </div>
+        <div class="small-4 columns">
+          <input type="text" name="memory-offset" placeholder="0" style="text-align:center;">
+        </div>
+        <div class="small-2 columns end">
+          <a href="#" class="button postfix submit">Set</a>
+        </div>
+      </div>
+
       <div class="row">
         <div class="large-12 columns">
+          <span class="<%=selected == 'generalPurpose' ? 'hide' : ''%>" style="font-size:11px;">Showing up to 100 addresses(32-bit) starting at the offset</span>
           <div class="table-wrapper">
             <table>
               <thead>
                 <tr>
-                  <th>Register</th>
+                  <th><%=selected == 'generalPurpose' ? 'Register' : 'Address'%></th>
                   <th>Value</th>
                 </tr>
               </thead>
               <tbody>
-                <%_.each(memory.generalPurpose,function(register){%>
+                <%_.each(memory[selected],function(register){%>
                   <tr>
                     <td><%=register.name%></td>
                     <td><%='0x'+('00000000'+register.value.toString(16).toUpperCase()).slice(-8)%></td>
