@@ -40,7 +40,7 @@ def handle_websocket():
             if m is not None:
                 #NOTE: Every valid message sent will have a pruState hash and a type string
                 message = json.loads(m)
-                print(message)
+
                 response = {}
 
                 if message['action'] == "connect":
