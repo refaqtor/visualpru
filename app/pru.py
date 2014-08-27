@@ -1,3 +1,6 @@
+from __future__ import print_function
+from __future__ import division
+
 import os
 import mmap
 import struct
@@ -47,14 +50,14 @@ class PRU:
         self.pruss_mmap[register_offset:register_offset+byte_count] = packed_value
 
     def is_running(self):
-        r = self.read_register(self.constants.PRUSS_PRU_CTRL_OFFSET+self.shared_constants.CONTROL_OFFSET,4)
+        r = self.read_register(self.constants.CONTROL_BLOCK_OFFSET+self.shared_constants.CONTROL_REGISTER_OFFSET,4)
         if (r & (1<<self.shared_constants.RUNSTATE_BIT)) == 0:
             return False
         else:
             return True
 
     def reset(self,value=None):
-        r = self.read_register(self.constants.PRUSS_PRU_CTRL_OFFSET+self.shared_constants.CONTROL_OFFSET,4)
+        r = self.read_register(self.constants.CONTROL_BLOCK_OFFSET+self.shared_constants.CONTROL_REGISTER_OFFSET,4)
         #Clear bit to trigger a reset
         r &= ~(1<<self.shared_constants.SOFT_RST_N_BIT)
 
@@ -64,20 +67,20 @@ class PRU:
             r &= ~(0xFFFF<<self.shared_constants.PCOUNTER_RST_VAL_BIT)
             r |= ((value & 0xFFFF)<<self.shared_constants.PCOUNTER_RST_VAL_BIT)
 
-        self.write_register(self.constants.PRUSS_PRU_CTRL_OFFSET+self.shared_constants.CONTROL_OFFSET,4,r)
+        self.write_register(self.constants.CONTROL_BLOCK_OFFSET+self.shared_constants.CONTROL_REGISTER_OFFSET,4,r)
 
     def set_singlestep_mode(self):
-        r = self.read_register(self.constants.PRUSS_PRU_CTRL_OFFSET+self.shared_constants.CONTROL_OFFSET,4)
+        r = self.read_register(self.constants.CONTROL_BLOCK_OFFSET+self.shared_constants.CONTROL_REGISTER_OFFSET,4)
         r |= (1<<self.shared_constants.SINGLE_STEP_BIT)
-        self.write_register(self.constants.PRUSS_PRU_CTRL_OFFSET+self.shared_constants.CONTROL_OFFSET,4,r)
+        self.write_register(self.constants.CONTROL_BLOCK_OFFSET+self.shared_constants.CONTROL_REGISTER_OFFSET,4,r)
 
     def set_freerunning_mode(self):
-        r = self.read_register(self.constants.PRUSS_PRU_CTRL_OFFSET+self.shared_constants.CONTROL_OFFSET,4)
+        r = self.read_register(self.constants.CONTROL_BLOCK_OFFSET+self.shared_constants.CONTROL_REGISTER_OFFSET,4)
         r &= ~(1<<self.shared_constants.SINGLE_STEP_BIT)
-        self.write_register(self.constants.PRUSS_PRU_CTRL_OFFSET+self.shared_constants.CONTROL_OFFSET,4,r)
+        self.write_register(self.constants.CONTROL_BLOCK_OFFSET+self.shared_constants.CONTROL_REGISTER_OFFSET,4,r)
 
     def get_run_mode(self):
-        r = self.read_register(self.constants.PRUSS_PRU_CTRL_OFFSET+self.shared_constants.CONTROL_OFFSET,4)
+        r = self.read_register(self.constants.CONTROL_BLOCK_OFFSET+self.shared_constants.CONTROL_REGISTER_OFFSET,4)
         if r&(1<<self.shared_constants.SINGLE_STEP_BIT) != 0:
             mode = 'step'
         else:
@@ -93,25 +96,27 @@ class PRU:
         return status
 
     def get_program_counter_value(self):
-        r = self.read_register(self.constants.PRUSS_PRU_CTRL_OFFSET+self.shared_constants.STATUS_OFFSET,4)
+        r = self.read_register(self.constants.CONTROL_BLOCK_OFFSET+self.shared_constants.STATUS_REGISTER_OFFSET,4)
         return r & 0xFFFF
 
     def halt(self):
-        r = self.read_register(self.constants.PRUSS_PRU_CTRL_OFFSET+self.shared_constants.CONTROL_OFFSET,4)
+        r = self.read_register(self.constants.CONTROL_BLOCK_OFFSET+self.shared_constants.CONTROL_REGISTER_OFFSET,4)
         r &= ~(1<<self.shared_constants.ENABLE_BIT)
-        self.write_register(self.constants.PRUSS_PRU_CTRL_OFFSET+self.shared_constants.CONTROL_OFFSET,4,r)
+        self.write_register(self.constants.CONTROL_BLOCK_OFFSET+self.shared_constants.CONTROL_REGISTER_OFFSET,4,r)
 
     def run(self):
-        r = self.read_register(self.constants.PRUSS_PRU_CTRL_OFFSET+self.shared_constants.CONTROL_OFFSET,4)
+        r = self.read_register(self.constants.CONTROL_BLOCK_OFFSET+self.shared_constants.CONTROL_REGISTER_OFFSET,4)
         r |= (1<<self.shared_constants.ENABLE_BIT)
-        self.write_register(self.constants.PRUSS_PRU_CTRL_OFFSET+self.shared_constants.CONTROL_OFFSET,4,r)
+        self.write_register(self.constants.CONTROL_BLOCK_OFFSET+self.shared_constants.CONTROL_REGISTER_OFFSET,4,r)
 
     def write_opcodes_to_iram(self,opcodes):
         for i,opcode in enumerate(opcodes):
-            self.write_register(self.constants.PRU_IRAM_OFFSET+i*4,4,opcode)
+            address = self.constants.IRAM_RANGE[0]+i*4
+            if address >= self.constants.IRAM_RANGE[0] and address <= self.constants.IRAM_RANGE[1]:
+                self.write_register(address,4,opcode)
 
     def get_gpreg_register(self,offset):
-        return self.read_register(self.constants.PRU_ICSS_PRU_DEBUG_OFFSET+self.shared_constants.GPREG_OFFSET+offset*4,4)
+        return self.read_register(self.constants.DEBUG_BLOCK_OFFSET+self.shared_constants.GPREG_BLOCK_OFFSET+offset*4,4)
 
     def get_gpreg_registers(self):
         registers = []
@@ -123,15 +128,17 @@ class PRU:
     def get_dram_block(self):
         registers = []
         for i in range(self.memory_range['dram']['address_count']):
-            address = self.constants.PRU_DRAM_OFFSET+self.memory_range['dram']['offset']+i*4
-            registers.append({'name' : hex(address), 'value': self.read_register(address,4)})
+            address = self.constants.DRAM_RANGE[0]+self.memory_range['dram']['offset']+i*4
+            if address >= self.constants.DRAM_RANGE[0] and address <= self.constants.DRAM_RANGE[1]:
+                registers.append({'name' : hex(address), 'value': self.read_register(address,4)})
         return registers
 
     def get_shareddram_block(self):
         registers = []
         for i in range(self.memory_range['shared']['address_count']):
-            address = self.shared_constants.PRU_SHAREDDRAM_OFFSET+self.memory_range['shared']['offset']+i*4
-            registers.append({'name' : hex(address), 'value': self.read_register(address,4)})
+            address = self.shared_constants.SHAREDDRAM_RANGE[0]+self.memory_range['shared']['offset']+i*4
+            if address >= self.shared_constants.SHAREDDRAM_RANGE[0] and address <= self.shared_constants.SHAREDDRAM_RANGE[1]:
+                registers.append({'name' : hex(address), 'value': self.read_register(address,4)})
         return registers
 
     def compile_and_upload_program(self, compilation_directory, source_files):
